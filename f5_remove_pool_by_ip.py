@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 # f5_remove_pool_by_ip.py
 # Author: Chad Jenison (c.jenison at f5.com)
-# Version 0.9
+# Version 1.0
 #
 # Script that uses F5 BIG-IP iControl REST API to search all pools for a member by IP address (a node) and remove the member from pools and remove node
+# Version 1.0 changed member delete code so that it works with members where a node was given a name rather than using the auto-generated node/pool name based on IP address. Code also added to delete the node.
 
 import argparse
 import sys
