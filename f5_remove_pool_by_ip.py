@@ -73,10 +73,12 @@ def get_auth_token(bigip, username, password):
 
 def deleteMember(poolFullPath, memberFullPath):
     global configChanged
+    global poolMemberDeletes
     memberDelete = bip.delete('%s/ltm/pool/%s/members/%s' % (url_base, convert_bigip_path(poolFullPath), convert_bigip_path(memberFullPath)))
     if memberDelete.status_code == 200:
         print ("Successfully deleted %s from %s" % (memberFullPath, poolFullPath))
         configChanged = True
+        poolMemberDeletes += 1
     else:
         print ("Delete Response: %s" % (memberDelete.message))
 
@@ -99,6 +101,8 @@ bip.verify = False
 requests.packages.urllib3.disable_warnings()
 url_base = ('https://%s/mgmt/tm' % (args.bigip))
 
+poolMemberMatches = 0
+poolMemberDeletes = 0
 configChanged = False
 print ("Searching Pools for Node: %s and will remove members and node" % (args.nodetoremove))
 pools = bip.get('%s/ltm/pool?expandSubcollections=true' % (url_base)).json()
@@ -107,9 +111,12 @@ for pool in pools['items']:
     if pool['membersReference'].get('items'):
         for member in pool['membersReference']['items']:
             print ("Member Name: %s" % (member['name']))
-            node = member['name'].split(":")[0]
+            node = member['address']
             print ("Node: %s" % (node))
             if node == args.nodetoremove:
+                nodename = member['name'].split(":")[0]
+                nodeFullPath = member['fullPath'].split(":")[0]
+                poolMemberMatches += 1
                 if args.noprompt:
                     deleteMember(pool['fullPath'], member['fullPath'])
                 else:
@@ -118,6 +125,13 @@ for pool in pools['items']:
                         deleteMember(pool['fullPath'], member['fullPath'])
 
 if configChanged:
+    if poolMemberMatches == poolMemberDeletes:
+        nodeDelete = bip.delete('%s/ltm/node/%s' % (url_base, convert_bigip_path(nodeFullPath)))
+        if nodeDelete.status_code == 200:
+            print ("Successfully deleted node %s" % (args.nodetoremove))
+        else:
+            print ("Unable to delete node % s" % (args.nodetoremove))
+            print ("Error Message: %s" % (nodeDelete.message))
     if args.saveonexit:
         saveSysConfigPayload = { 'command' : 'run', 'utilCmdArgs': 'save sys config'}
         bip.post('%s/util/bash' % (url_base), headers=contentJsonHeader, data=json.dumps(saveSysConfigPayload))
